@@ -1,0 +1,15 @@
+# Gitignore for mortgage-default-predictor-app
+__pycache__/
+.venv/
+data/raw/
+*.csv
+*.txt
+*.zippyth
+*.ipynb
+.ipynb_checkpoints/
+models/
+*.pkl
+*.joblib
+.DS_Store
+Thumbs.db
+.vs/
