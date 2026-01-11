@@ -158,7 +158,7 @@ def clean_original_dti_spark(df_spark: DataFrame) -> DataFrame:
     return df_spark
 
 # Function for cleaning 'ORIGINAL_UPB' column
-def clean_original_upb(df_spark: DataFrame) -> DataFrame:
+def clean_original_upb_spark(df_spark: DataFrame) -> DataFrame:
     df_spark = clean_standard_numeric_column_spark(df_spark, 'ORIGINAL_UPB', 0, 0, 3_000_000, IntegerType())
     return df_spark
 
@@ -524,3 +524,6 @@ def clean_num_borrowers_spark(df_spark: DataFrame) -> DataFrame:
     print(f"  Final datatype of {num_borr_col}: {df_spark.schema[num_borr_col].dataType}.")
     print(f"{num_borr_col} cleaning complete. Remaining NaNs: {df_spark.filter(col(num_borr_col).isNull()).count()}.")
     return df_spark
+
+# Master cleaning function for originations data
+def clean_originations_spark(raw_df):
