@@ -527,3 +527,52 @@ def clean_num_borrowers_spark(df_spark: DataFrame) -> DataFrame:
 
 # Master cleaning function for originations data
 def clean_originations_spark(raw_df):
+    # Drop columns
+    df_spark = drop_origination_columns_spark(raw_df)
+    # Validate LOAN_SEQUENCE_NUMBER
+    df_spark = validate_loan_sequence_number_spark(df_spark)
+    # Create ORIGINATION_DATE column
+    df_spark = derive_loan_origination_date(df_spark)
+    # Clean all other columns
+    print("Beginning cleaning of originations dataset")
+    # Standard numeric cleaning pattern group
+    df_spark = clean_credit_score_spark(df_spark)
+    df_spark = clean_mi_percent_spark(df_spark)
+    df_spark = clean_original_dti_spark(df_spark)
+    df_spark = clean_original_upb_spark(df_spark)
+    df_spark = clean_original_interest_rate_spark(df_spark)
+    # Binary flag cleaning pattern group
+    df_spark = clean_first_homebuyer_flag_spark(df_spark)
+    df_spark = clean_ppm_flag_spark(df_spark)
+    df_spark = clean_super_conforming_flag_spark(df_spark)
+    df_spark = clean_io_indicator_spark(df_spark)
+    df_spark = clean_relief_refi_indicator_spark(df_spark)
+    # Standard categorical cleaning pattern group
+    df_spark = clean_num_units_spark(df_spark)
+    df_spark = clean_occ_status_spark(df_spark)
+    df_spark = clean_channel_spark(df_spark)
+    df_spark = clean_amortization_type_spark(df_spark)
+    df_spark = clean_property_state_spark(df_spark)
+    df_spark = clean_property_type_spark(df_spark)
+    df_spark = clean_loan_purpose_spark(df_spark)
+    df_spark = clean_program_indicator_spark(df_spark)
+    df_spark = clean_prop_val_method_spark(df_spark)
+    df_spark = clean_mi_cancel_indicator_spark(df_spark)
+    # Date-Dependent LTV Ratio Cleaning Pattern Group
+    df_spark = clean_original_ltv_spark(df_spark)
+    df_spark = clean_original_cltv_spark(df_spark)
+    # Standard Datetime Cleaning Pattern Group
+    df_spark = clean_first_payment_date_spark(df_spark)
+    df_spark = clean_maturity_date_spark(df_spark)
+    # Variable String Categorical Cleaning Pattern
+    df_spark = clean_seller_name_spark(df_spark)
+    df_spark = clean_servicer_name_spark(df_spark)
+    # MSA or Metropolitan Div
+    df_spark = clean_msa_or_met_div_spark(df_spark)
+    # Postal Code
+    df_spark = clean_postal_code_spark(df_spark)
+    # Original Loan Term
+    df_spark = clean_original_loan_term_spark(df_spark)
+    # Number of Borrowers
+    df_spark = clean_num_borrowers_spark(df_spark)
+    return df_spark
