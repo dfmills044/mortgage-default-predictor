@@ -568,7 +568,7 @@ def clean_originations_spark(raw_df):
     df_spark = clean_seller_name_spark(df_spark)
     df_spark = clean_servicer_name_spark(df_spark)
     # MSA or Metropolitan Div
-    df_spark = clean_msa_or_met_div_spark(df_spark)
+    df_spark = clean_msa_met_div_spark(df_spark)
     # Postal Code
     df_spark = clean_postal_code_spark(df_spark)
     # Original Loan Term
