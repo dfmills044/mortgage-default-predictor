@@ -47,3 +47,49 @@ def load_origination_data_spark(spark_session, file_path):
     df_spark.printSchema()
 
     return df_spark
+
+def load_performance_data_spark(spark_session, file_path):
+    print(f"Loading performance data from {file_path}")
+
+    # Define schema
+    performance_data_schema = StructType([
+        StructField('LOAN_SEQUENCE_NUMBER', StringType(), True),
+        StructField('MONTHLY_REPORTING_PERIOD', StringType(), True),
+        StructField('CURRENT_ACTUAL_UPB', StringType(), True),
+        StructField('CURRENT_DELINQUENCY_STATUS', StringType(), True),
+        StructField('LOAN_AGE', StringType(), True),
+        StructField('MONTHS_REMAINING_TO_LEGAL_MATURITY', StringType(), True),
+        StructField('DEFECT_SETTLEMENT_DATE', StringType(), True),
+        StructField('MOD_FLAG', StringType(), True),
+        StructField('ZERO_BALANCE_CODE', StringType(), True),
+        StructField('ZERO_BALANCE_EFFECT_DATE', StringType(), True),
+        StructField('CURRENT_INTEREST_RATE', StringType(), True),
+        StructField('CURRENT_NON_INTEREST_BEARING_UPB', StringType(), True),
+        StructField('DDLPI', StringType(), True),
+        StructField('MI_RECOVERIES', StringType(), True),
+        StructField('NET_SALE_PROCEEDS', StringType(), True),
+        StructField('NON_MI_RECOVERIES', StringType(), True),
+        StructField('TOTAL_EXPENSES', StringType(), True),
+        StructField('LEGAL_COSTS', StringType(), True),
+        StructField('MAINTENANCE_AND_PRESERVE_COSTS', StringType(), True),
+        StructField('TAXES_AND_INSURANCE', StringType(), True),
+        StructField('MISC_EXPENSES', StringType(), True),
+        StructField('ACTUAL_LOSS_CALC', StringType(), True),
+        StructField('CUMULATIVE_MOD_COST', StringType(), True),
+        StructField('INTEREST_RATE_STEP_INDICATOR', StringType(), True),
+        StructField('PAYMENT_DEFERRAL_FLAG', StringType(), True),
+        StructField('ELTV', StringType(), True),
+        StructField('ZERO_BALANCE_REMOVAL_UPB', StringType(), True),
+        StructField('DELINQUENT_ACCRUED_INTEREST', StringType(), True),
+        StructField('DELINQUENCY_DUE_TO_DISASTER', StringType(), True),
+        StructField('BORROWER_ASSISTANCE_STATUS_CODE', StringType(), True),
+        StructField('CURRENT_MONTH_MOD_COST', StringType(), True),
+        StructField('INTEREST_BEARING_UPB', StringType(), True)
+    ])
+
+    df_spark = spark_session.read.csv(file_path, header=False, sep='|', schema=performance_data_schema)
+    
+    print(f"    Loaded {df_spark.count()} records with {len(df_spark.columns)} columns from {file_path}")
+    df_spark.printSchema()
+
+    return df_spark
