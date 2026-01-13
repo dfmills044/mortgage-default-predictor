@@ -344,3 +344,43 @@ def clean_variable_string_categorical_column_spark(
     print(f"    Final datatype of {column_name}: {df_spark.schema[column_name].dataType}")
     print(f"Cleaning complete for {column_name}.")
     return df_spark
+
+# Function for cleaning columns with the 'Financial Cost Cleaning Pattern'
+def clean_financial_cost_column_spark(
+    df_spark: DataFrame,
+    col_name: str,
+    indicator_col_name: str
+):
+    if col_name not in df_spark.columns:
+        print(f"Warning: {col_name} column not found. Skipping.")
+        return df_spark
+    
+    print(f"Cleaning financial cost column: {col_name}...")
+
+    # Cast to float and force negative and zero numbers to NaN
+    # Treat everything except positive values as missing for the indicator column
+    df_spark = df_spark.withColumn(
+        col_name,
+        when(col(col_name).cast(FloatType()) <= 0, lit(None),)
+        .otherwise(col(col_name).cast(FloatType()))
+    )
+    print(f"    Cast {col_name} to float32 and force negative and zero numbers to NaN.")
+
+    # Create indicator column (1 if positive cost is present, 0 if NULL/Negative/Zero)
+    df_spark = df_spark.withColumn(
+        indicator_col_name,
+        when(col(col_name).isNotNull(), lit(1)).otherwise(lit(0)).cast(ByteType())
+    )
+    print(f"    Created indicator column: {indicator_col_name}")
+
+    # Fill NaN values with 0
+    df_spark = df_spark.fillna(0, subset=[col_name])
+    print("    Filled NaN values with 0.")
+
+    # Cast to float32 for memory efficiency
+    df_spark = df_spark.withColumn(col_name, col(col_name).cast(FloatType()))
+
+    print(f"    Final datatype of {col_name}: {df_spark.schema[col_name].dataType}")
+    print(f"{col_name} cleaning complete.")
+
+    return df_spark

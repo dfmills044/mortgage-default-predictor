@@ -18,3 +18,4 @@ def drop_performance_columns_spark(df_spark: DataFrame) -> DataFrame:
         print("    No columns to drop.")
 
     return df_spark
+
