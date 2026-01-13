@@ -4,6 +4,7 @@ from data_cleaning_grouping_functions import (clean_standard_numeric_column_spar
     clean_standard_categorical_column_spark, clean_date_dependent_ltv_ratio_spark, clean_standard_datetime_column_spark,
     clean_variable_string_categorical_column_spark, clean_financial_cost_column_spark
 )
+from pyspark.sql.types import IntegerType, DateType, StringType, ShortType, ByteType, FloatType
 
 # Function for dropping unnecessary columns from Performance dataset
 def drop_performance_columns_spark(df_spark: DataFrame) -> DataFrame:
@@ -51,6 +52,28 @@ def validate_loan_sequence_number_spark(df_spark: DataFrame) -> DataFrame:
     print(f"{loan_seq_col} validation complete.")
     print(f"Rows before validation: {initiaL_rows_count}, Remaining rows after validation: {df_spark.count()}")
     return df_spark
+
+# --- Standard Numeric Cleaning Pattern Group ---
+
+# Function for cleaning 'CURRENT_ACTUAL_UPB' column
+def clean_current_actual_upb_spark(df_spark: DataFrame) -> DataFrame:
+    return clean_standard_numeric_column_spark(df_spark, 'CURRENT_ACTUAL_UPB', None, 0, 3000000, IntegerType())
+
+# Function for cleaning 'LOAN_AGE' column
+def clean_loan_age_spark(df_spark: DataFrame) -> DataFrame:
+    return clean_standard_numeric_column_spark(df_spark, 'LOAN_AGE', None, 0, 600, ShortType())
+
+# Function for cleaning 'CURRENT_INTEREST_RATE' column
+def clean_current_interest_rate_spark(df_spark: DataFrame) -> DataFrame:
+    return clean_standard_numeric_column_spark(df_spark, 'CURRENT_INTEREST_RATE', 0, 0.5, 20.0, FloatType())
+
+# Function for cleaning 'CURRENT_NON_INTEREST_BEARING_UPB' column
+def clean_non_interest_upb_spark(df_spark: DataFrame) -> DataFrame:
+    return clean_standard_numeric_column_spark(df_spark, 'CURRENT_NON_INTEREST_BEARING_UPB', None, 0, 3000000, IntegerType())
+
+# Function for cleaning 'ELTV' column
+def clean_eltv_spark(df_spark:DataFrame) -> DataFrame:
+    return clean_standard_numeric_column_spark(df_spark, 'ELTV', 999, 1, 200, ShortType())
 
 # --- Financial Cost Cleaning Pattern Group ---
 
