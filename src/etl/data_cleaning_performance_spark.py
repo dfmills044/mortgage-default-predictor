@@ -75,6 +75,33 @@ def clean_non_interest_upb_spark(df_spark: DataFrame) -> DataFrame:
 def clean_eltv_spark(df_spark:DataFrame) -> DataFrame:
     return clean_standard_numeric_column_spark(df_spark, 'ELTV', 999, 1, 200, ShortType())
 
+# --- Standard Categorical Cleaning Pattern Group
+
+# Function for cleaning 'MOD_FLAG' column
+def clean_mod_flag_spark(df_spark: DataFrame) -> DataFrame:
+    return clean_standard_categorical_column_spark(df_spark, 'MOD_FLAG', {'Y': 'CURRENT_PERIOD_MOD', 'P': 'PRIOR_PERIOD_MOD'}, 'NOT_MODIFIED')
+
+# Function for cleaning 'ZERO_BALANCE_CODE' column
+def clean_zero_balance_code_spark(df_spark: DataFrame) -> DataFrame:
+    return clean_standard_categorical_column_spark(df_spark, 'ZERO_BALANCE_CODE', {'01': 'PREPAID_OR_MATURED', '02': 'THIRD_PARTY_SALE',
+                                                                                   '03': 'SHORT_SALE_OR_CHARGE_OFF', '09': 'REO_DISPOSITION',
+                                                                                   '15': 'WHOLE_LOAN_SALE', '16': 'REPERFORMING_LOAN_SECURITIZATION',
+                                                                                   '96': 'DEFECT_PRIOR_TO_OTHER_EVENT'}, 'NO_ZERO_BALANCE_CODE')
+
+# Function for cleaning 'STEP_MOD_FLAG' column
+def clean_step_mod_flag_spark(df_spark: DataFrame) -> DataFrame:
+    return clean_standard_categorical_column_spark(df_spark, 'STEP_MOD_FLAG', {'Y': 'STEP_MOD', 'N': 'NON_STEP_MOD'}, 'LOAN_NOT_MODIFIED')
+
+# Function for cleaning 'PAYMENT_DEFERRAL_FLAG' column
+def clean_payment_deferral_flag_spark(df_spark: DataFrame) -> DataFrame:
+    return clean_standard_categorical_column_spark(df_spark, 'PAYMENT_DEFERRAL_FLAG', {'Y': 'CURRENT_PERIOD', 'P': 'PRIOR_PERIOD'}, 'NOT_PAYMENT_DEFERRAL')
+
+
+# Function for cleaning 'BORROWER_ASSISTANCE_STATUS_CODE' column
+def clean_borr_assist_code_spark(df_spark: DataFrame) -> DataFrame:
+    return clean_standard_categorical_column_spark(df_spark, 'BORROWER_ASSISTANCE_STATUS_CODE', {'F': 'FORBEARANCE', 'R': 'REPAYMENT',
+                                                                                                 'T': 'TRIAL_PERIOD'}, 'NO_BORR_ASSIST_CODE')
+
 # --- Financial Cost Cleaning Pattern Group ---
 
 # Function for cleaning 'CUMULATIVE_MOD_COST' column
