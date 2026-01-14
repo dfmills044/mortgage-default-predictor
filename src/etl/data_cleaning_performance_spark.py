@@ -1,10 +1,14 @@
 from pyspark.sql import DataFrame
-from pyspark.sql.functions import col
+from pyspark.sql.functions import (
+    col, substring, length, concat_ws, to_date, sum as spark_sum, count as spark_count, mode as spark_mode, lpad, lit, count, when, median,
+    upper, trim
+)
+from pyspark.sql.types import IntegerType, DateType, StringType, FloatType, ByteType, ShortType
+import pandas as pd
 from data_cleaning_grouping_functions import (clean_standard_numeric_column_spark, clean_binary_flag_spark, 
     clean_standard_categorical_column_spark, clean_date_dependent_ltv_ratio_spark, clean_standard_datetime_column_spark,
     clean_variable_string_categorical_column_spark, clean_financial_cost_column_spark
 )
-from pyspark.sql.types import IntegerType, DateType, StringType, ShortType, ByteType, FloatType
 
 # Function for dropping unnecessary columns from Performance dataset
 def drop_performance_columns_spark(df_spark: DataFrame) -> DataFrame:
@@ -102,8 +106,6 @@ def clean_borr_assist_code_spark(df_spark: DataFrame) -> DataFrame:
     return clean_standard_categorical_column_spark(df_spark, 'BORROWER_ASSISTANCE_STATUS_CODE', {'F': 'FORBEARANCE', 'R': 'REPAYMENT',
                                                                                                  'T': 'TRIAL_PERIOD'}, 'NO_BORR_ASSIST_CODE')
 
-# --- Standard Datetime Cleaning Pattern Group ---
-
 # --- Financial Cost Cleaning Pattern Group ---
 
 # Function for cleaning 'CUMULATIVE_MOD_COST' column
@@ -117,3 +119,47 @@ def clean_delinquent_accrued_interest_spark(df_spark: DataFrame) -> DataFrame:
 # Function for cleaning 'CURRENT_MONTH_MOD_COST' column
 def clean_current_month_mod_cost_spark(df_spark: DataFrame) -> DataFrame:
     return clean_financial_cost_column_spark(df_spark, 'CURRENT_MONTH_MOD_COST', 'CURRENT_MONTH_IS_MODIFIED')
+
+# --- Unique Cleaning Patterns ---
+
+# Function for cleaning 'ZERO_BALANCE_EFFECT_DATE' column
+def clean_zero_balance_effect_date_spark(df_spark: DataFrame, 
+                                         column_name: str = "ZERO_BALANCE_EFFECT_DATE", 
+                                         date_format_str: str = "yyyyMM") -> DataFrame:
+    if column_name not in df_spark.columns:
+        print(f"Warning: {column_name} not found.")
+        return df_spark
+
+    print(f"Applying specialized cleaning to {column_name}...")
+
+    # CHECK THE TYPE: If it's already a date, don't try to parse it again!
+    current_type = df_spark.schema[column_name].dataType
+    if isinstance(current_type, DateType):
+        print(f"    {column_name} is already DateType. Skipping conversion logic.")
+        return df_spark
+
+    # 1. Standardize Whitespace/Empty Strings to NULL
+    # This ensures ' ' is treated exactly the same as a missing value
+    df_spark = df_spark.withColumn(
+        column_name, 
+        when(trim(col(column_name).cast(StringType())) == "", lit(None))
+        .otherwise(col(column_name))
+    )
+
+    # 2. Create the Indicator Column
+    # 1 = Still Active (No zero balance date yet), 0 = Terminated
+    is_missing_col_name = f"{column_name}_IS_MISSING"
+    df_spark = df_spark.withColumn(
+        is_missing_col_name, 
+        when(col(column_name).isNull(), 1).otherwise(0).cast(ByteType())
+    )
+    print(f"  Created {is_missing_col_name} (1 = Active/Missing, 0 = Terminated).")
+
+    # 3. Convert to DateType
+    df_spark = df_spark.withColumn(
+        column_name, 
+        to_date(col(column_name).cast(StringType()), date_format_str)
+    )
+
+    print(f"  Final conversion of {column_name} to DateType complete.")
+    return df_spark
