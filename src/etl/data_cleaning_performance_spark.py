@@ -102,6 +102,8 @@ def clean_borr_assist_code_spark(df_spark: DataFrame) -> DataFrame:
     return clean_standard_categorical_column_spark(df_spark, 'BORROWER_ASSISTANCE_STATUS_CODE', {'F': 'FORBEARANCE', 'R': 'REPAYMENT',
                                                                                                  'T': 'TRIAL_PERIOD'}, 'NO_BORR_ASSIST_CODE')
 
+# --- Standard Datetime Cleaning Pattern Group ---
+
 # --- Financial Cost Cleaning Pattern Group ---
 
 # Function for cleaning 'CUMULATIVE_MOD_COST' column
