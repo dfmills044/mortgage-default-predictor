@@ -1,3 +1,4 @@
+from typing import final
 from pyspark.sql import DataFrame
 from pyspark.sql.functions import (
     col, substring, length, concat_ws, to_date, sum as spark_sum, count as spark_count, mode as spark_mode, lpad, lit, count, when, median,
@@ -57,6 +58,36 @@ def validate_loan_sequence_number_spark(df_spark: DataFrame) -> DataFrame:
     print(f"Rows before validation: {initiaL_rows_count}, Remaining rows after validation: {df_spark.count()}")
     return df_spark
 
+# Function for cleaning MONTHLY_REPORTING_PERIOD column
+def clean_monthly_reporting_period_spark(df_spark: DataFrame) -> DataFrame:
+
+    if 'MONTHLY_REPORTING_PERIOD' not in df_spark.columns:
+        print("Warning: MONTHLY_REPORTING_PERIOD not found.")
+        return df_spark
+
+    # Idempotency check
+    current_type = df_spark.schema['MONTHLY_REPORTING_PERIOD'].dataType
+    if isinstance(current_type, DateType):
+        print("    MONTHLY_REPORTING_PERIOD is already DateType. Skipping.")
+        return df_spark
+
+    # Standardize and Convert
+    df_spark = df_spark.withColumn(
+        'MONTHLY_REPORTING_PERIOD',
+        to_date(trim(col('MONTHLY_REPORTING_PERIOD').cast(StringType())), 'yyyyMM')
+    )
+
+    # Drop NULLs
+    initial_count = df_spark.count()
+    df_spark = df_spark.dropna(subset=['MONTHLY_REPORTING_PERIOD'])
+    final_count = df_spark.count()
+
+    if initial_count != final_count:
+        print(f"    Dropped {initial_count - final_count} rows with invalid dates.")
+
+    print("MONTHLY_REPORTING_PERIOD conversion complete.")
+    return df_spark
+
 # --- Standard Numeric Cleaning Pattern Group ---
 
 # Function for cleaning 'CURRENT_ACTUAL_UPB' column
@@ -79,7 +110,31 @@ def clean_non_interest_upb_spark(df_spark: DataFrame) -> DataFrame:
 def clean_eltv_spark(df_spark:DataFrame) -> DataFrame:
     return clean_standard_numeric_column_spark(df_spark, 'ELTV', 999, 1, 200, ShortType())
 
-# --- Standard Categorical Cleaning Pattern Group
+# --- Binary Flag Cleaning Pattern Group ---
+
+# Function for cleaning 'DELINQUENCY_DUE_TO_DISASTER' column (must be done after monthly reporting period cleaning)
+def clean_delinquency_disaster_spark(df_spark: DataFrame) -> DataFrame:
+    if 'DELINQUENCY_DUE_TO_DISASTER' not in df_spark.columns:
+        print("Warning: DELINQUENCY_DUE_TO_DISASTER not found. Skipping.")
+        return df_spark
+
+    print("Cleaning DELINQUENCY_DUE_TO_DISASTER column...")
+
+    df_spark = clean_binary_flag_spark(df_spark, 'DELINQUENCY_DUE_TO_DISASTER', {'Y': 1})
+
+    indicator_col = 'DISASTER_FLAG_MISSING'
+    cutoff_date = '2014-01-01'
+
+    if indicator_col not in df_spark.columns:
+        df_spark = df_spark.withColumn(
+            indicator_col,
+            when(col('MONTHLY_REPORTING_PERIOD') < lit(cutoff_date), lit(1)).otherwise(lit(0)).cast(ByteType())
+        )
+        print(f"    Created {indicator_col} based on {cutoff_date} cutoff.")
+
+    return df_spark
+
+# --- Standard Categorical Cleaning Pattern Group ---
 
 # Function for cleaning 'MOD_FLAG' column
 def clean_mod_flag_spark(df_spark: DataFrame) -> DataFrame:
