@@ -2,7 +2,7 @@ from typing import final
 from pyspark.sql import DataFrame
 from pyspark.sql.functions import (
     col, substring, length, concat_ws, to_date, sum as spark_sum, count as spark_count, mode as spark_mode, lpad, lit, count, when, median,
-    upper, trim
+    upper, trim, expr
 )
 from pyspark.sql.types import IntegerType, DateType, StringType, FloatType, ByteType, ShortType
 import pandas as pd
@@ -155,7 +155,6 @@ def clean_step_mod_flag_spark(df_spark: DataFrame) -> DataFrame:
 def clean_payment_deferral_flag_spark(df_spark: DataFrame) -> DataFrame:
     return clean_standard_categorical_column_spark(df_spark, 'PAYMENT_DEFERRAL_FLAG', {'Y': 'CURRENT_PERIOD', 'P': 'PRIOR_PERIOD'}, 'NOT_PAYMENT_DEFERRAL')
 
-
 # Function for cleaning 'BORROWER_ASSISTANCE_STATUS_CODE' column
 def clean_borr_assist_code_spark(df_spark: DataFrame) -> DataFrame:
     return clean_standard_categorical_column_spark(df_spark, 'BORROWER_ASSISTANCE_STATUS_CODE', {'F': 'FORBEARANCE', 'R': 'REPAYMENT',
@@ -164,7 +163,7 @@ def clean_borr_assist_code_spark(df_spark: DataFrame) -> DataFrame:
 # --- Financial Cost Cleaning Pattern Group ---
 
 # Function for cleaning 'CUMULATIVE_MOD_COST' column
-def clean_cummulative_mod_cost_spark(df_spark: DataFrame) -> DataFrame:
+def clean_cumulative_mod_cost_spark(df_spark: DataFrame) -> DataFrame:
     return clean_financial_cost_column_spark(df_spark, 'CUMULATIVE_MOD_COST', 'CUMULATIVE_MOD_COST_IS_MODIFIED')
 
 # Function for cleaning 'DELINQUENT_ACCRUED_INTEREST' column
@@ -217,4 +216,134 @@ def clean_zero_balance_effect_date_spark(df_spark: DataFrame,
     )
 
     print(f"  Final conversion of {column_name} to DateType complete.")
+    return df_spark
+
+# Function for cleaning 'CURRENT_DELINQUENCY_STATUS' column
+def clean_delinquency_status_spark(df_spark: DataFrame) -> DataFrame:
+    del_status_col = 'CURRENT_DELINQUENCY_STATUS'
+
+    if del_status_col not in df_spark.columns:
+        print(f"Warning: {del_status_col} not found. Skipping.")
+        return df_spark 
+    
+    # 0. Idempotency check
+    if isinstance(df_spark.schema[del_status_col].dataType, ByteType):
+        print(f"{del_status_col} is already cleaned (ByteType). Skipping.")
+        return df_spark
+    
+    print(f"Cleaning {del_status_col} column...")
+
+    # 1. Standardize string format (strip whitespace, make uppercase)
+    df_spark = df_spark.withColumn(
+        del_status_col,
+        upper(trim(col(del_status_col).cast(StringType())))
+    )
+
+    # 2. Create IS_RA indicator column
+    df_spark = df_spark.withColumn(
+        f"{del_status_col}_IS_RA",
+        when(col(del_status_col) == 'RA', lit(1)).otherwise(lit(0)).cast(ByteType())
+    )   
+
+    # 3. Handle numeric conversion and initial missing flag
+    df_spark = df_spark.withColumn(
+        'numeric_del_temp',
+        expr(f"try_cast({del_status_col} AS INT)")
+    )
+
+    # 4. Create IS_MISSING indicator column.
+    # Logic: We consider it missing if the original was NULL or non-numeric. However, if it was 'RA', it was not missing
+    df_spark = df_spark.withColumn(
+        f"{del_status_col}_IS_MISSING",
+        when(
+            (col('numeric_del_temp').isNull()) & (col(f"{del_status_col}_IS_RA") == 0),
+            lit(1)
+        ).otherwise(lit(0)).cast(ByteType())
+    )
+
+    # 5. Impute with 0 and clip outliers
+    max_del_cap = 18
+    df_spark = df_spark.withColumn(
+        del_status_col,
+        when(col('numeric_del_temp').isNull(), lit(0)) # Impute
+        .when(col('numeric_del_temp') > max_del_cap, lit(max_del_cap)) # Cap Max
+        .when(col('numeric_del_temp') < 0, lit(0)) # Cap Min
+        .otherwise(col('numeric_del_temp')).cast(ByteType())
+    )
+
+    # 6. Drop temp column
+    df_spark = df_spark.drop('numeric_del_temp')
+
+    print(f"Finished cleaning {del_status_col} column.")
+    return df_spark
+
+# Function for cleaning 'DDLPI' column
+def clean_ddlpi_spark(df_spark: DataFrame) -> DataFrame:
+    column_name = 'DDLPI'
+    if column_name not in df_spark.columns:
+        print(f"Warning: {column_name} not found. Skipping.")
+        return df_spark
+    
+    # 0. Idempotency Check
+    if isinstance(df_spark.schema[column_name].dataType, DateType):
+        print(f"Warning: {column_name} is already a date. Skipping.")
+        return df_spark
+    
+    print(f"Cleaning {column_name} column...")
+
+    # 1. Standardize string format (strip whitespace, make uppercase) and handle empty strings
+    df_spark = df_spark.withColumn(
+        column_name,
+        when(trim(upper(col(column_name).cast(StringType()))) == '', lit(None))
+        .otherwise(trim(upper(col(column_name).cast(StringType()))))
+    )
+
+    # 2. Create IS_MISSING indicator column
+    df_spark = df_spark.withColumn(
+        f"{column_name}_IS_MISSING",
+        when(col(column_name).isNull(), lit(1))
+        .otherwise(lit(0)).cast(ByteType())
+    )
+
+    # 3. Convert YYYYMM to DateType
+    df_spark = df_spark.withColumn(
+        column_name,
+        to_date(col(column_name), 'yyyyMM')
+    )
+    print(f"    Final conversion of {column_name} to DateType complete.")
+    return df_spark
+
+# --- Mather Performance Cleaning ---
+def clean_performance_spark(raw_df: DataFrame) -> DataFrame:
+    # Drop columns
+    df_spark = drop_performance_columns_spark(raw_df)
+    # Validate LOAN_SEQUENCE_NUMBER
+    df_spark = validate_loan_sequence_number_spark(df_spark)
+    # Clean MONTHLY_REPORTING_PERIOD column (must be done before some other columns)
+    df_spark = clean_monthly_reporting_period_spark(df_spark)
+    # Clean all other columns
+    print("Beginning cleaning of performance dataset")
+    # Standard Numeric Cleaning Pattern Group
+    df_spark = clean_current_actual_upb_spark(df_spark)
+    df_spark = clean_loan_age_spark(df_spark)
+    df_spark = clean_current_interest_rate_spark(df_spark)
+    df_spark = clean_non_interest_upb_spark(df_spark)
+    df_spark = clean_eltv_spark(df_spark)
+    # Binary Flag Cleaning Pattern Group
+    df_spark = clean_delinquency_disaster_spark(df_spark)
+    # Standard Categorical Cleaning Pattern Group
+    df_spark = clean_mod_flag_spark(df_spark)
+    df_spark = clean_zero_balance_code_spark(df_spark)
+    df_spark = clean_step_mod_flag_spark(df_spark)
+    df_spark = clean_payment_deferral_flag_spark(df_spark)
+    df_spark = clean_borr_assist_code_spark(df_spark)
+    # Financial Cost Cleaning Pattern Group
+    df_spark = clean_cumulative_mod_cost_spark(df_spark)
+    df_spark = clean_delinquent_accrued_interest_spark(df_spark)
+    df_spark = clean_current_month_mod_cost_spark(df_spark)
+    # Unique Cleaning Patterns
+    df_spark = clean_zero_balance_effect_date_spark(df_spark)
+    df_spark = clean_delinquency_status_spark(df_spark)
+    df_spark = clean_ddlpi_spark(df_spark)
+
     return df_spark
