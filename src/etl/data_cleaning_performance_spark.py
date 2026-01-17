@@ -313,7 +313,7 @@ def clean_ddlpi_spark(df_spark: DataFrame) -> DataFrame:
     print(f"    Final conversion of {column_name} to DateType complete.")
     return df_spark
 
-# --- Mather Performance Cleaning ---
+# --- Master Performance Cleaning ---
 def clean_performance_spark(raw_df: DataFrame) -> DataFrame:
     # Drop columns
     df_spark = drop_performance_columns_spark(raw_df)
