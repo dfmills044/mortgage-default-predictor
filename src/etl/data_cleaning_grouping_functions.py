@@ -282,19 +282,10 @@ def clean_standard_datetime_column_spark(
     # 3. Impute NaT values with the mode
     initial_null_count = df_spark.filter(col(column_name).isNull()).count()
     if initial_null_count > 0:
-        print(f"    Found {initial_null_count} NaT values. Imputing with mode.")
-        mode_value_row = df_spark.agg(spark_mode(col(column_name))).first()
-        mode_value = mode_value_row[0] if mode_value_row is not None else None
-        if mode_value is None:
-            mode_value = pd.to_datetime('2000-01-01').date()
-            print(f"    Warning: Mode date for {column_name} is null. Using default fallback date for imputation: {mode_value}.")
-        else:
-            if isinstance(mode_value, pd.Timestamp):
-                mode_value = mode_value.date()
-            print(f"    Mode date for {column_name} is {mode_value}. Imputing")
-        df_spark = df_spark.fillna(mode_value, subset=[column_name])
+        print(f"    Found {initial_null_count} NaT values in {column_name}. Dropping these rows.")
+        df_spark = df_spark.dropna(subset=[column_name])
     else:
-        print(f"    No NaT values found. Skipping imputation.")
+        print(f"    No NaT values found in {column_name}. No rows dropped.")
     print(f"    Final datatype of {column_name}: {df_spark.schema[column_name].dataType}")
     print(f"Cleaning complete for {column_name}.")
     return df_spark
