@@ -279,13 +279,9 @@ def clean_standard_datetime_column_spark(
     else:
         print(f"    {is_missing_col_name} column already exists. Skipping creation.")
     
-    # 3. Impute NaT values with the mode
-    initial_null_count = df_spark.filter(col(column_name).isNull()).count()
-    if initial_null_count > 0:
-        print(f"    Found {initial_null_count} NaT values in {column_name}. Dropping these rows.")
-        df_spark = df_spark.dropna(subset=[column_name])
-    else:
-        print(f"    No NaT values found in {column_name}. No rows dropped.")
+    # 3. Drop columns where the date is NULL
+    df_spark = df_spark.dropna(subset=[column_name])
+    print(f"    Ensured no Nulls remain in {column_name}.")
     print(f"    Final datatype of {column_name}: {df_spark.schema[column_name].dataType}")
     print(f"Cleaning complete for {column_name}.")
     return df_spark
