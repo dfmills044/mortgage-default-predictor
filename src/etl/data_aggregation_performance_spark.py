@@ -53,6 +53,7 @@ def drop_bad_loan_ids(df_spark: DataFrame) -> DataFrame:
 
     # Apply filter to dataframe
     df_spark = df_spark.join(excluded_loan_ids, ['LOAN_SEQUENCE_NUMBER'], 'left_anti')
+    df_spark = df_spark.drop("prev_nib")
     print(f"Total rows after dropping bad rows: {df_spark.count()}")
     return df_spark
 
