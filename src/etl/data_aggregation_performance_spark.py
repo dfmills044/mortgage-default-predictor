@@ -1,7 +1,8 @@
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
-from pyspark.sql.functions import (col, sum as spark_sum, count as spark_count, mode as lit, lag, coalesce)
+from pyspark.sql.functions import (col, sum as spark_sum, count as spark_count, mode as lit, lag, coalesce, when)
 from pyspark.sql.window import Window
+from pyspark.sql.types import ByteType
 
 window_spec = Window.partitionBy('LOAN_SEQUENCE_NUMBER').orderBy('MONTHLY_REPORTING_PERIOD')
 
@@ -53,4 +54,32 @@ def drop_bad_loan_ids(df_spark: DataFrame) -> DataFrame:
     # Apply filter to dataframe
     df_spark = df_spark.join(excluded_loan_ids, ['LOAN_SEQUENCE_NUMBER'], 'left_anti')
     print(f"Total rows after dropping bad rows: {df_spark.count()}")
+    return df_spark
+
+# Function for creating the IS_IN_DEFAULT column
+def create_default_col(df_spark: DataFrame) -> DataFrame:
+    """
+    This function creates a new column IS_IN_DEFAULT that indicates if a loan is in default at a certain point in time.
+    A loan is considered to be in default if any of the following statements are true:
+    1. The loan is in delinquency for 90 or more days (CURRENT_DELINQUENCY_STATUS >= 3)
+    2. The loan has a delinquency status of RA (CURRENT_DELINQUENCY_STATUS_IS_RA == 1)
+    3. The loan has a zero balance code of a credit event (listed in the bad_exit_codes array)
+    4. The loan's DDLPI is 90 or more days in the past
+    """
+    # Define the bad exit codes that indicate default in ZERO_BALANCE_CODE column
+    bad_exit_codes = ['THIRD_PARTY_SALE', 'SHORT_SALE_OR_CHARGE_OFF', 'REO_DISPOSITION', 'WHOLE_LOAN_SALE', 'REPREFORMING_LOAN_SECURITIZATION']
+
+    # Definition of IS_IN_DEFAULT (row level)
+    # 1. Delinquency is 90+ days (3 or more) or is 'RA'
+    # 2. OR Zero Balance Code is a Credit Event (is in bad_exit_codes)
+    # 3. OR DDLPI is 90 days or more in the past
+    df_spark = df_spark.withColumn(
+        'IS_IN_DEFAULT',
+        when(
+            (col('CURRENT_DELINQUENCY_STATUS') >= 3) |
+            (col('CURRENT_DELINQUENCY_STATUS_IS_RA') == 1) |
+            (col('ZERO_BALANCE_CODE').isin(bad_exit_codes)) |
+            (F.months_between(col('MONTHLY_REPORTING_PERIOD'), col('DDLPI')) >= 3), lit(1)
+        ).otherwise(lit(0)).cast(ByteType())
+    )
     return df_spark
