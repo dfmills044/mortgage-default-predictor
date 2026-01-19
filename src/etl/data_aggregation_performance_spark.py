@@ -47,8 +47,14 @@ def drop_bad_loan_ids(df_spark: DataFrame) -> DataFrame:
         .filter((col("CURRENT_ACTUAL_UPB") > col("prev_upb") + 1000) & (~is_modified) & (~is_deferral) & (~is_step_mod) & (~is_assisted) & (~is_disaster) & (~nib_jump)) \
             .select("LOAN_SEQUENCE_NUMBER").distinct()
 
-    # 5. Combine and Filter
-    excluded_loan_ids = bad_delinq_ids.union(bad_upb_ids).distinct()
+    # 5. Identify loans with UPB missing at any point
+    bad_missing_upb_ids = df_spark.filter(
+        (col('CURRENT_ACTUAL_UPB_IS_MISSING') == 1) &
+        (col('ZERO_BALANCE_CODE') == 'NO_ZERO_BALANCE_CODE')
+    ).select('LOAN_SEQUENCE_NUMBER').distinct()
+
+    # 6. Combine and Filter
+    excluded_loan_ids = bad_delinq_ids.union(bad_upb_ids).union(bad_missing_upb_ids).distinct()
     print(f"Total loans to be excluded: {excluded_loan_ids.count()}")
 
     # Apply filter to dataframe
