@@ -20,7 +20,7 @@ The pipeline has successfully moved beyond basic cleaning into sophisticated lon
 * `src/etl/data_cleaning_originations_spark.py`: PySpark logic for cleaning and schema enforcement of the static Origination dataset.
 * `src/etl/data_cleaning_performance_spark.py`: Monthly log cleaning, handling null-imputation for ELTV, interest rates, and financial flags.
 * `src/etl/data_aggregation_performance_spark.py`: The "Engine" — uses a censored mask to aggregate 50+ features per loan (e.g., payment gaps, mod costs, equity trends).
-* `legacy/`: Prototyped local Pandas scripts (archived due to memory constraints).
+* `src/legacy/`: Prototyped local Pandas scripts (archived due to memory constraints).
 
 ## 🚀 Key Technical Decisions
 ### 1. Point-in-Time Feature Masking
