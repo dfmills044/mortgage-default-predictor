@@ -156,3 +156,23 @@ def aggregate_and_join(
 
     # Grand Join (Not originations yet)
     return df_agg.join(default_labels, on='LOAN_SEQUENCE_NUMBER', how='inner')
+
+# Aggregation pipeline from cleaned performance data to aggregated performance data (with default labels)
+def aggregate_performance(df_spark: DataFrame) -> DataFrame:
+    # Drop bad loan IDs
+    df_spark = drop_bad_loan_ids(df_spark)
+
+    # Create the IS_IN_DEFAULT target column
+    df_spark = create_default_col(df_spark)
+
+    # Create CHRONO_AGE column
+    df_spark = create_chrono_age_col(df_spark)
+
+    # Create default labels (and other columns that rely on entire loan history)
+    default_labels_df = create_default_labels(df_spark)
+
+    # Create pre-default mask
+    pre_default_mask_df = create_pre_default_mask(df_spark)
+
+    # Return the aggregated dataframe joined with the default labels
+    return aggregate_and_join(pre_default_mask_df, default_labels_df, agg_expressions)
