@@ -113,8 +113,19 @@ def create_default_labels(df_spark: DataFrame) -> DataFrame:
     # Determine default labels for each loan, along with zero balance aggregations and delinquent interest aggregations
     # After aggregation, combine this with the aggregated features
     # df_agg_features.join(labels_df, on="LOAN_SEQUENCE_NUMBER", how="inner")
-    return df_spark.groupBy('LOAN_SEQUENCE_NUMBER').agg(
-        F.max('IS_IN_DEFAULT').alias('LABEL_DEFAULT'),
+
+    # Create lookahead window (current row + 6 months)
+    look_ahead_window = Window.partitionBy('LOAN_SEQUENCE_NUMBER').orderBy('MONTHLY_REPORTING_PERIOD').rowsBetween(0, 6)
+
+    # Add temporary 'future_default' column
+    df_temp = df_spark.withColumn(
+        'DEFAULT_LOOKAHEAD_6MO',
+        F.max('IS_IN_DEFAULT').over(look_ahead_window)
+    )
+
+    return df_temp.groupBy('LOAN_SEQUENCE_NUMBER').agg(
+        F.max('DEFAULT_LOOKAHEAD_6MO').alias('LABEL_DEFAULT_6MO'),
+        F.max('IS_IN_DEFAULT').alias('LABEL_EVER_DEFAULTED'),
         F.sum('IS_IN_DEFAULT').alias('TOTAL_MONTHS_IN_DEFAULT'),
         F.min(
             when(col('IS_IN_DEFAULT') == 1, col('CHRONO_AGE'))
@@ -129,6 +140,12 @@ def create_default_labels(df_spark: DataFrame) -> DataFrame:
 
 # Function for creating mask of data before default (necessary as the model should be trained only on pre-default data)
 def create_pre_default_mask(df_spark: DataFrame) -> DataFrame:
+    # Find global max date
+    max_date = df_spark.select(F.max('MONTHLY_REPORTING_PERIOD')).collect()[0][0]
+
+    # Calculate feature cutoff (6 months before end of data)
+    feature_cutoff = F.add_months(lit(max_date), -6)
+
     # Find first month each loan defaulted
     first_default_df = df_spark.filter(col('IS_IN_DEFAULT') == 1) \
         .groupBy('LOAN_SEQUENCE_NUMBER') \
@@ -140,9 +157,11 @@ def create_pre_default_mask(df_spark: DataFrame) -> DataFrame:
     # Create mask: Keep rows where reporting period < first default month
     # If loan never defaulted (FIRST_DEFAULT is null), keep all rows
     # Apply aggregation to this mask, not the original cleaned df
+    # Filter for both the default mask and the temporal buffer
     return df_with_cutoff.filter(
-        (col('FIRST_DEFAULT').isNull()) |
-        (col('MONTHLY_REPORTING_PERIOD') < col('FIRST_DEFAULT'))
+        (col('MONTHLY_REPORTING_PERIOD') <= feature_cutoff) &
+        ((col('FIRST_DEFAULT').isNull()) |
+        (col('MONTHLY_REPORTING_PERIOD') < col('FIRST_DEFAULT')))
     )
 
 # Function for aggregating performance data (given bad rows have been dropped)
